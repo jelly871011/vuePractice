@@ -1,51 +1,54 @@
+/* eslint-disable no-tabs */
+
 module.exports = {
-	'env': {
-		'browser': true,
-		'es2021': true
+	env: {
+		browser: true,
+		es2021: true,
 	},
-	'extends': [
+	extends: [
+		'plugin:vue/vue3-essential',
+		'airbnb-base',
 		'eslint:recommended',
 		'plugin:@typescript-eslint/recommended',
-		'plugin:vue/vue3-essential'
+		'@vue/eslint-config-airbnb',
 	],
-	'overrides': [
+	overrides: [
 		{
-			'env': {
-				'node': true
+			env: {
+				node: true,
 			},
-			'files': [
-				'.eslintrc.{js,cjs}'
+			files: [
+				'.eslintrc.{js,cjs}',
 			],
-			'parserOptions': {
-				'sourceType': 'script'
-			}
-		}
+			parserOptions: {
+				sourceType: 'script',
+			},
+		},
 	],
-	'parserOptions': {
-		'ecmaVersion': 'latest',
-		'parser': '@typescript-eslint/parser',
-		'sourceType': 'module'
+	parserOptions: {
+		ecmaVersion: 'latest',
+		parser: '@typescript-eslint/parser',
+		sourceType: 'module',
 	},
-	'plugins': [
+	plugins: [
 		'@typescript-eslint',
-		'vue'
+		'vue',
 	],
-	'rules': {
-		'indent': [
+	rules: {
+		indent: [
 			'error',
-			'tab'
+			'tab',
 		],
-		'linebreak-style': [
+		quotes: [
 			'error',
-			'unix'
+			'single',
 		],
-		'quotes': [
+		semi: [
 			'error',
-			'single'
+			'always',
 		],
-		'semi': [
-			'error',
-			'always'
-		]
-	}
+		'vue/no-multiple-template-root': [
+			'off',
+		],
+	},
 };
