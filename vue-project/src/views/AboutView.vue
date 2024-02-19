@@ -1,67 +1,173 @@
 <!-- eslint-disable no-tabs -->
 <script lang="ts" setup>
-import { ref, onMounted, nextTick } from 'vue';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
+import type { AxiosResponse } from 'axios';
+import { ElMessage } from 'element-plus';
 
 // data
-const message = ref('');
-const dataList = ref('');
-const dialogVisible = ref(false);
+const searchMessage = ref('');
+const editDialog = ref(false);
+const deleteDialog = ref(false);
 const tableData = ref([]);
-const form = ref({ name: '', username: '' });
-const options = ref([
-	{
-		id: 1, pageNumber: 20, text: '/page',
-	},
-]);
+const form = ref({
+	_id: '', name: '', username: '', enable: true,
+});
+
+// pagination
+const currentPage = ref(1);
+const pageSize = ref(20);
+const totalItems = ref(0);
+
+// todo: 分頁功能
+// todo: 新建帳號時，限制輸入字元
+// todo: 搜尋功能（模糊搜尋..）
+
+/**
+ * 轉換日期格式
+ */
+function formatTableData(data) {
+	return data.map((item: { created_at: string; }) => {
+		const date = new Date(item.created_at);
+		const formattedDate = date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+		return {
+			...item,
+			created_at: formattedDate,
+		};
+	});
+}
 
 /**
  * 取得後台帳號列表
  */
 const getTableData = async () => {
-	const response = await axios.get('/api/v1/users/list');
-	tableData.value = response.data.ret;
+	const response = await axios.get('/api/v1/users/list', {
+	});
+
+	tableData.value = formatTableData(response.data.ret);
 };
+
+/**
+ * 設定表單值
+ */
+function setFormValue(row: { _id: string; username: string; name: string; enable: boolean; }) {
+	const {
+		username, _id, name, enable,
+	} = row;
+
+	form.value = {
+		username,
+		name,
+		_id,
+		enable,
+	};
+}
+
+/**
+ * 顯示訊息
+ */
+function showMessage(message: string, type: 'success' | 'error') {
+	ElMessage({
+		message,
+		type,
+		center: true,
+		offset: 1,
+	});
+}
 
 /**
  * 新增/編輯會員
  */
-const onSubmit = async () => {
-	await nextTick();
-	console.log(form.value.name);
-	// post要傳入form接到的username,name
-	const response = await axios.post('/api/v1/users', { username: 'ddd', name: 'ddd' });
-	dialogVisible.value = false;
-	console.log(response.data);
-};
-const onEdit = async () => {
-	console.log(form.value);
-	// put要傳入form接到的id
-	const response = await axios.put('/api/v1/users/65cdb30c94d7555f63d0d27c');
-	console.log(response.data);
-};
-function openCreateDialog() {
-	dialogVisible.value = !dialogVisible.value;
+function openEditDialog(row: { _id: string; username: string; name: string; enable: boolean;}) {
+	editDialog.value = true;
+	setFormValue(row);
 }
-function openEditDialog(row: { username: string; name: string; editing: boolean; }) {
-	form.value.username = row.username;
-	form.value.name = row.name;
-	row.editing = true;
+
+const updateData = async () => {
+	let res: AxiosResponse;
+	const { _id: id } = form.value;
+
+	try {
+		if (id !== undefined && id !== '') {
+			res = await axios.put(`/api/v1/users/${id}`, form.value);
+		} else {
+			res = await axios.post('/api/v1/users', form.value);
+		}
+
+		if (res.data.result === 'ok') {
+			showMessage('更新成功', 'success');
+			getTableData();
+		} else {
+			showMessage('更新失敗', 'error');
+		}
+	} catch (error) {
+		showMessage('更新失敗', 'error');
+		console.error(error);
+	}
+
+	editDialog.value = false;
+};
+
+function closeEditDialog() {
+	editDialog.value = false;
 }
+
 /**
  * 刪除會員
  */
-const onDelete = async () => {
-	console.log(form.value);
-	// delete要傳入form接到的id
-	const response = await axios.delete('/api/v1/users/65cdb6cb94d7555f63d0d282');
-	console.log(response.data);
-};
-function closeEditDialog(row: { editing: boolean; }) {
-	if (row.editing) {
-		row.editing = false;
-	}
+function openDeleteDialog(row: { _id: string; username: string; name: string; enable: boolean; }) {
+	deleteDialog.value = true;
+	setFormValue(row);
 }
+
+const deleteData = async () => {
+	const { _id: id } = form.value;
+
+	try {
+		const res = await axios.delete(`/api/v1/users/${id}`, { data: form.value });
+		if (res.data.result === 'ok') {
+			showMessage('更新成功', 'success');
+			getTableData();
+		} else {
+			showMessage('更新失敗', 'error');
+		}
+	} catch (error) {
+		showMessage('更新失敗', 'error');
+		console.error(error);
+	}
+	deleteDialog.value = false;
+};
+
+function closeDeleteDialog() {
+	deleteDialog.value = false;
+}
+
+/**
+ * 啟用/停用
+ */
+function handleSwitchChange(row: {
+  _id: string;
+  username: string;
+  name: string;
+  enable: boolean;
+}) {
+	form.value = row;
+	updateData();
+}
+
+/**
+ * 分頁
+ */
+const handleSizeChange = async (val: number) => {
+	pageSize.value = val;
+	await getTableData();
+};
+const handleCurrentChange = async (val: number) => {
+	currentPage.value = val;
+	await getTableData();
+};
+
 onMounted(() => {
 	getTableData();
 });
@@ -70,14 +176,37 @@ onMounted(() => {
 <template>
   <div>
     <h1>後台帳號管理</h1>
-    <input v-model="message" placeholder="尋找" />
-    <el-button type="primary" plain @click="openCreateDialog">新增</el-button>
+    <input v-model="searchMessage" placeholder="尋找" />
+    <el-button type="primary" plain @click="openEditDialog">新增</el-button>
+    <el-table :data="tableData" style="width: 100%">
+      <el-table-column label="排序" />
+      <el-table-column prop="created_at" label="建立時間" />
+      <el-table-column prop="username" label="帳號" />
+      <el-table-column prop="name" label="暱稱" />
+      <el-table-column prop="enable" label="啟用/停用">
+        <template v-slot="{ row }">
+          <el-switch
+            v-model="row.enable"
+            active-color="#13ce66"
+            inactive-color="#ff4949"
+            @change="handleSwitchChange(row)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="編輯">
+        <template v-slot="{ row }">
+          <el-button v-model="row.id" type="primary" @click="openEditDialog(row)">編輯</el-button>
+          <el-button v-model="row.id" type="primary" @click="openDeleteDialog(row)">刪除</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
     <el-dialog
-      title="新增會員"
-      v-model="dialogVisible"
+      :title="form._id ? '編輯會員' : '新增會員'"
+      :data="form"
+      v-model="editDialog"
       width="30%"
     >
-      <el-form :model="form" ref="form" label-width="80px">
+      <el-form :model="form" label-width="80px">
         <el-form-item label="帳號" prop="username">
           <el-input v-model="form.username" />
         </el-form-item>
@@ -85,49 +214,28 @@ onMounted(() => {
           <el-input v-model="form.name" />
         </el-form-item>
       </el-form>
-      <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" @click="onSubmit">新增</el-button>
+      <el-button @click="closeEditDialog">取消</el-button>
+      <el-button type="primary" @click="updateData">確認</el-button>
     </el-dialog>
-    <el-table :data="tableData" style="width: 100%">
-      <el-table-column label="排序" />
-      <el-table-column prop="created_at" label="建立時間" />
-      <el-table-column prop="username" label="帳號" />
-      <el-table-column prop="name" label="暱稱" />
-      <el-table-column prop="enable" label="啟用/停用" align="center">
-        <template v-slot="{ row }">
-          <el-switch v-model="row.enable" active-color="#13ce66" inactive-color="#ff4949" />
-        </template>
-      </el-table-column>
-      <el-table-column label="編輯">
-        <template v-slot="{ row }">
-          <el-button v-model="row.enable" type="primary" @click="openEditDialog(row)">編輯</el-button>
-          <el-button type="primary" @click="onDelete(row)">刪除</el-button>
-          <el-dialog
-            title="編輯會員"
-            v-model="row.editing"
-            width="30%"
-          >
-            <el-form :model="form" ref="form" label-width="80px">
-              <el-form-item label="帳號" prop="username">
-                <el-input v-model="form.username" />
-              </el-form-item>
-              <el-form-item label="暱稱" prop="name">
-                <el-input v-model="form.name" />
-              </el-form-item>
-            </el-form>
-            <el-button @click="closeEditDialog(row)">取消</el-button>
-            <el-button type="primary" @click="onEdit(row)">修改</el-button>
-          </el-dialog>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-select v-model="dataList" placeholder="顯示資料">
-      <el-option
-        v-for="item in options"
-        :key="item.id"
-        :value="item.pageNumber + item.text"
-      />
-    </el-select>
+    <el-dialog
+      title="是否刪除此會員?"
+      :data="form"
+      v-model="deleteDialog"
+      width="20%"
+    >
+      <span style="display: block;">帳號: {{ form.username }}</span>
+      <span style="display: block;">暱稱: {{ form.name }}</span>
+      <el-button @click="closeDeleteDialog">取消</el-button>
+      <el-button type="primary" @click="deleteData">刪除</el-button>
+    </el-dialog>
+    <el-pagination
+      @size-change="handleSizeChange"
+      @current-change="handleCurrentChange"
+      :current-page="currentPage"
+      :page-size="pageSize"
+      layout="sizes, prev, pager, next"
+      :page-sizes="[20, 30, 40]"
+      :total="totalItems" />
   </div>
 </template>
 
@@ -143,8 +251,11 @@ onMounted(() => {
     height: 2rem;
     border-radius: 0.2rem;
   }
+  .el-message {
+    margin-top: 1rem;
+    margin-left: 1rem;
+  }
+  .el-pagination {
+    margin-top: 1rem;
+  }
 </style>
-
-function nextTick() {
-  throw new Error('Function not implemented.');
-}
