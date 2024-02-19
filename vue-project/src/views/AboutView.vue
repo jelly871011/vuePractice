@@ -16,25 +16,21 @@ const form = ref({
 
 // pagination
 const currentPage = ref(1);
-const pageSize = ref(20);
-const totalItems = ref(0);
+const pageSize = ref(10);
+const totalItems = ref(tableData.value.length);
 
-// todo: 分頁功能
 // todo: 新建帳號時，限制輸入字元
 // todo: 搜尋功能（模糊搜尋..）
 
 /**
- * 轉換日期格式
+ * 顯示訊息
  */
-function formatTableData(data) {
-	return data.map((item: { created_at: string; }) => {
-		const date = new Date(item.created_at);
-		const formattedDate = date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
-
-		return {
-			...item,
-			created_at: formattedDate,
-		};
+function showMessage(message: string, type: 'success' | 'error') {
+	ElMessage({
+		message,
+		type,
+		center: true,
+		offset: 50,
 	});
 }
 
@@ -42,10 +38,38 @@ function formatTableData(data) {
  * 取得後台帳號列表
  */
 const getTableData = async () => {
-	const response = await axios.get('/api/v1/users/list', {
-	});
+	try {
+		const response = await axios.get('/api/v1/users/list');
 
-	tableData.value = formatTableData(response.data.ret);
+		response.data.ret.sort((
+			a: { created_at: string },
+			b: { created_at: string },
+		) => {
+			const dateA = new Date(a.created_at).getTime();
+			const dateB = new Date(b.created_at).getTime();
+			return dateB - dateA;
+		});
+
+		tableData.value = response.data.ret.map((item: { created_at: string }, index: number) => {
+			const date = new Date(item.created_at);
+			const formattedDate = date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+
+			return {
+				...item,
+				created_at: formattedDate,
+				index: index + 1,
+			};
+		});
+
+		totalItems.value = tableData.value.length;
+
+		const startIndex = (currentPage.value - 1) * pageSize.value;
+		const endIndex = currentPage.value * pageSize.value;
+		tableData.value = tableData.value.slice(startIndex, endIndex);
+	} catch (error) {
+		showMessage('讀取失敗', 'error');
+		console.error(error);
+	}
 };
 
 /**
@@ -62,18 +86,6 @@ function setFormValue(row: { _id: string; username: string; name: string; enable
 		_id,
 		enable,
 	};
-}
-
-/**
- * 顯示訊息
- */
-function showMessage(message: string, type: 'success' | 'error') {
-	ElMessage({
-		message,
-		type,
-		center: true,
-		offset: 1,
-	});
 }
 
 /**
@@ -179,7 +191,7 @@ onMounted(() => {
     <input v-model="searchMessage" placeholder="尋找" />
     <el-button type="primary" plain @click="openEditDialog">新增</el-button>
     <el-table :data="tableData" style="width: 100%">
-      <el-table-column label="排序" />
+      <el-table-column prop="index" label="排序" />
       <el-table-column prop="created_at" label="建立時間" />
       <el-table-column prop="username" label="帳號" />
       <el-table-column prop="name" label="暱稱" />
@@ -234,7 +246,7 @@ onMounted(() => {
       :current-page="currentPage"
       :page-size="pageSize"
       layout="sizes, prev, pager, next"
-      :page-sizes="[20, 30, 40]"
+      :page-sizes="[10, 20, 30]"
       :total="totalItems" />
   </div>
 </template>
