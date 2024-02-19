@@ -13,13 +13,26 @@ const tableData = ref([]);
 const form = ref({
 	_id: '', name: '', username: '', enable: true,
 });
+const formRef = ref(null);
 
 // pagination
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalItems = ref(tableData.value.length);
 
-// todo: 新建帳號時，限制輸入字元
+// rules
+const rules = ref({
+	username: [
+		{ required: true, message: '帳號不可為空', trigger: 'blur' },
+		{
+			min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur',
+		},
+		{
+			pattern: /^[a-z0-9]+$/i, message: '帳號只能包含字母和數字', trigger: 'change',
+		},
+	],
+});
+
 // todo: 搜尋功能（模糊搜尋..）
 
 /**
@@ -125,6 +138,18 @@ function closeEditDialog() {
 	editDialog.value = false;
 }
 
+const submitForm = () => {
+	if (formRef.value) {
+		formRef.value.validate((valid: boolean) => {
+			if (valid) {
+				updateData();
+			}
+			editDialog.value = false;
+			showMessage('更新失敗', 'error');
+		});
+	}
+};
+
 /**
  * 刪除會員
  */
@@ -218,7 +243,7 @@ onMounted(() => {
       v-model="editDialog"
       width="30%"
     >
-      <el-form :model="form" label-width="80px">
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="80px">
         <el-form-item label="帳號" prop="username">
           <el-input v-model="form.username" />
         </el-form-item>
@@ -227,10 +252,10 @@ onMounted(() => {
         </el-form-item>
       </el-form>
       <el-button @click="closeEditDialog">取消</el-button>
-      <el-button type="primary" @click="updateData">確認</el-button>
+      <el-button type="primary" @click="submitForm">確認</el-button>
     </el-dialog>
     <el-dialog
-      title="是否刪除此會員?"
+      title="確認刪除此會員?"
       :data="form"
       v-model="deleteDialog"
       width="20%"
@@ -238,7 +263,7 @@ onMounted(() => {
       <span style="display: block;">帳號: {{ form.username }}</span>
       <span style="display: block;">暱稱: {{ form.name }}</span>
       <el-button @click="closeDeleteDialog">取消</el-button>
-      <el-button type="primary" @click="deleteData">刪除</el-button>
+      <el-button type="primary" @click="deleteData">確認</el-button>
     </el-dialog>
     <el-pagination
       @size-change="handleSizeChange"
