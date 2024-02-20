@@ -1,9 +1,9 @@
 <!-- eslint-disable no-tabs -->
 <script lang="ts" setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import type { AxiosResponse } from 'axios';
-import { ElMessage } from 'element-plus';
+import { ElMessage, ElForm } from 'element-plus';
 
 // data
 const searchMessage = ref('');
@@ -13,7 +13,7 @@ const tableData = ref([]);
 const form = ref({
 	_id: '', name: '', username: '', enable: true,
 });
-const formRef = ref(null);
+const formRef = ref<typeof ElForm | null>(null);
 
 // pagination
 const currentPage = ref(1);
@@ -27,13 +27,14 @@ const rules = ref({
 		{
 			min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur',
 		},
-		{
-			pattern: /^[a-z0-9]+$/i, message: '帳號只能包含字母和數字', trigger: 'change',
-		},
+		// {
+		// 	pattern: /^[a-z0-9]+$/i, message: '帳號只能包含字母和數字', trigger: 'change',
+		// },
+	],
+	name: [
+		{ required: true, message: '暱稱不可為空', trigger: 'blur' },
 	],
 });
-
-// todo: 搜尋功能（模糊搜尋..）
 
 /**
  * 顯示訊息
@@ -84,6 +85,31 @@ const getTableData = async () => {
 		console.error(error);
 	}
 };
+
+/**
+ * 分頁
+ */
+const handleSizeChange = async (val: number) => {
+	pageSize.value = val;
+	await getTableData();
+};
+const handleCurrentChange = async (val: number) => {
+	currentPage.value = val;
+	await getTableData();
+};
+
+/**
+ * 模糊搜尋篩選資料
+ */
+const filteredData = computed(() => {
+	if (!searchMessage.value) {
+		return tableData.value;
+	}
+	return tableData.value.filter((item: { username: string, name: string }) => (
+		item.username.includes(searchMessage.value)
+    || item.name.includes(searchMessage.value)
+	));
+});
 
 /**
  * 設定表單值
@@ -138,14 +164,15 @@ function closeEditDialog() {
 	editDialog.value = false;
 }
 
-const submitForm = () => {
+const submitForm = async () => {
 	if (formRef.value) {
-		formRef.value.validate((valid: boolean) => {
+		formRef.value.validate(async (valid: boolean) => {
 			if (valid) {
-				updateData();
+				await updateData();
+				editDialog.value = false;
+			} else {
+				showMessage('更新失敗', 'error');
 			}
-			editDialog.value = false;
-			showMessage('更新失敗', 'error');
 		});
 	}
 };
@@ -193,18 +220,6 @@ function handleSwitchChange(row: {
 	updateData();
 }
 
-/**
- * 分頁
- */
-const handleSizeChange = async (val: number) => {
-	pageSize.value = val;
-	await getTableData();
-};
-const handleCurrentChange = async (val: number) => {
-	currentPage.value = val;
-	await getTableData();
-};
-
 onMounted(() => {
 	getTableData();
 });
@@ -213,9 +228,9 @@ onMounted(() => {
 <template>
   <div>
     <h1>後台帳號管理</h1>
-    <input v-model="searchMessage" placeholder="尋找" />
+    <input v-model="searchMessage" placeholder="搜尋帳號或暱稱" />
     <el-button type="primary" plain @click="openEditDialog">新增</el-button>
-    <el-table :data="tableData" style="width: 100%">
+    <el-table :data="filteredData" style="width: 100%">
       <el-table-column prop="index" label="排序" />
       <el-table-column prop="created_at" label="建立時間" />
       <el-table-column prop="username" label="帳號" />
