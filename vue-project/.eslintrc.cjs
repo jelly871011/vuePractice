@@ -35,6 +35,10 @@ module.exports = {
 		'vue',
 	],
 	rules: {
+		'vue/component-definition-name-casing': [
+			'off',
+		],
+		'no-tabs': 'off',
 		indent: [
 			'error',
 			'tab',
@@ -50,5 +54,6 @@ module.exports = {
 		'vue/no-multiple-template-root': [
 			'off',
 		],
+		'no-console': 'off',
 	},
 };

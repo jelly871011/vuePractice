@@ -1,9 +1,8 @@
-<!-- eslint-disable no-tabs -->
 <script lang="ts" setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import type { AxiosResponse } from 'axios';
-import { ElMessage, ElForm } from 'element-plus';
+import { ElForm, ElNotification } from 'element-plus';
 
 // data
 const searchMessage = ref('');
@@ -18,7 +17,7 @@ const formRef = ref<typeof ElForm | null>(null);
 // pagination
 const currentPage = ref(1);
 const pageSize = ref(10);
-const totalItems = ref(tableData.value.length);
+const totalItems = ref(0);
 
 // rules
 const rules = ref({
@@ -40,11 +39,9 @@ const rules = ref({
  * 顯示訊息
  */
 function showMessage(message: string, type: 'success' | 'error') {
-	ElMessage({
+	ElNotification({
 		message,
 		type,
-		center: true,
-		offset: 50,
 	});
 }
 
@@ -55,31 +52,27 @@ const getTableData = async () => {
 	try {
 		const response = await axios.get('/api/v1/users/list');
 
-		response.data.ret.sort((
+		const rawData = response.data.ret.sort((
 			a: { created_at: string },
 			b: { created_at: string },
-		) => {
-			const dateA = new Date(a.created_at).getTime();
-			const dateB = new Date(b.created_at).getTime();
-			return dateB - dateA;
-		});
+		) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-		tableData.value = response.data.ret.map((item: { created_at: string }, index: number) => {
+		const startIndex = (currentPage.value - 1) * pageSize.value;
+		const endIndex = currentPage.value * pageSize.value;
+
+		tableData.value = rawData.map((item: { created_at: string; }, index: number) => {
 			const date = new Date(item.created_at);
 			const formattedDate = date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
 
 			return {
 				...item,
-				created_at: formattedDate,
+				created_at: date,
+				formattedDate,
 				index: index + 1,
 			};
-		});
+		}).slice(startIndex, endIndex);
 
-		totalItems.value = tableData.value.length;
-
-		const startIndex = (currentPage.value - 1) * pageSize.value;
-		const endIndex = currentPage.value * pageSize.value;
-		tableData.value = tableData.value.slice(startIndex, endIndex);
+		totalItems.value = rawData.length;
 	} catch (error) {
 		showMessage('讀取失敗', 'error');
 		console.error(error);
@@ -148,16 +141,16 @@ const updateData = async () => {
 
 		if (res.data.result === 'ok') {
 			showMessage('更新成功', 'success');
-			getTableData();
+			await getTableData();
 		} else {
-			showMessage('更新失敗', 'error');
+			throw new Error('更新失敗');
 		}
 	} catch (error) {
 		showMessage('更新失敗', 'error');
 		console.error(error);
+	} finally {
+		editDialog.value = false;
 	}
-
-	editDialog.value = false;
 };
 
 function closeEditDialog() {
@@ -227,12 +220,14 @@ onMounted(() => {
 
 <template>
   <div>
-    <h1>後台帳號管理</h1>
-    <input v-model="searchMessage" placeholder="搜尋帳號或暱稱" />
-    <el-button type="primary" plain @click="openEditDialog">新增</el-button>
-    <el-table :data="filteredData" style="width: 100%">
+    <h1 style="font-size: 30px;" class="green">後台帳號管理</h1>
+    <el-row>
+      <input v-model="searchMessage" placeholder="搜尋帳號或暱稱" />
+      <el-button type="primary" @click="openEditDialog">新增會員</el-button>
+    </el-row>
+    <el-table class="el-table" :data="filteredData" style="width: 100%">
       <el-table-column prop="index" label="排序" />
-      <el-table-column prop="created_at" label="建立時間" />
+      <el-table-column prop="formattedDate" label="建立時間" />
       <el-table-column prop="username" label="帳號" />
       <el-table-column prop="name" label="暱稱" />
       <el-table-column prop="enable" label="啟用/停用">
@@ -285,6 +280,7 @@ onMounted(() => {
       @current-change="handleCurrentChange"
       :current-page="currentPage"
       :page-size="pageSize"
+      class="green"
       layout="sizes, prev, pager, next"
       :page-sizes="[10, 20, 30]"
       :total="totalItems" />
@@ -292,10 +288,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-  .el-select {
-    width: 10rem;
-    margin-top: 1rem;
-  }
   input {
     margin-bottom: 1rem;
     margin-right: 1rem;
@@ -303,11 +295,13 @@ onMounted(() => {
     height: 2rem;
     border-radius: 0.2rem;
   }
-  .el-message {
-    margin-top: 1rem;
-    margin-left: 1rem;
-  }
   .el-pagination {
     margin-top: 1rem;
+  }
+	.title {
+		display: flex;
+	}
+	.el-row {
+  float: right;
   }
 </style>

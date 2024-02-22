@@ -1,35 +1,50 @@
 @import './base.css';
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 1rem;
   font-weight: normal;
 }
 
 a,
 .green {
   text-decoration: none;
-  color: hsla(160, 100%, 37%, 1);
+  color: hsla(160, 100%, 37%, 1) !important;
   transition: 0.4s;
-  padding: 3px;
+}
+.el-menu-item:hover,
+.el-menu-item.is-active {
+  background-color: transparent !important;
+  color: hsla(160, 100%, 37%, 1) !important;
 }
 
-@media (hover: hover) {
-  a:hover {
-    background-color: hsla(160, 100%, 37%, 0.2);
-  }
+.el-menu-item {
+  text-align: center;
+}
+.el-main {
+  padding: 20px;
 }
 
-/* @media (min-width: 1024px) {
-  body {
-    display: flex;
-    place-items: center;
-  }
+.el-menu {
+  height: 1000px !important;
+  background-color: rgba(235, 235, 235, 0.64) !important;
+  border-width: 0.5px !important;
+}
 
-  #app {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 0 2rem;
-  }
-} */
+.el-aside {
+  width: 300px !important;
+}
+
+.title {
+  font-size: 20px !important;
+  font-weight: bold;
+  border-bottom: 1px solid rgba(60, 60, 60, 0.12);
+  color: #181818 !important;
+}
+
+.el-button {
+  background-color: hsla(160, 100%, 37%, 1) !important;
+  color:#ffffff !important;
+  border: 0cm !important;
+}
+.el-table-tr-bg-color {
+  background-color: transparent !important;
+}

@@ -1,3 +1,5 @@
+/* eslint-disable import/no-unresolved */
+/* eslint-disable import/no-extraneous-dependencies */
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import AutoImport from 'unplugin-auto-import/vite';
@@ -22,11 +24,11 @@ export default defineConfig({
 		},
 	},
 	server: {
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8000/',
-        changeOrigin: true,
-      },
-    },
-  },
+		proxy: {
+			'/api': {
+				target: 'http://localhost:8000/',
+				changeOrigin: true,
+			},
+		},
+	},
 });

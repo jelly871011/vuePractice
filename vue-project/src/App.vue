@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router';
+import { RouterView } from 'vue-router';
 </script>
 
 <template>
-  <header>
-    <div>
-      <nav>
-        <RouterLink to="/">Home</RouterLink>
-        <RouterLink to="/about">About</RouterLink>
-      </nav>
-    </div>
-  </header>
-  <RouterView />
+  <el-container>
+    <Aside />
+    <el-container>
+      <el-main>
+        <RouterView />
+      </el-main>
+    </el-container>
+  </el-container>
 </template>
 
 <style scoped>
@@ -41,10 +40,6 @@ nav a:first-of-type {
 }
 
 @media (min-width: 1024px) {
-  header {
-    display: block;
-    place-items: center;
-  }
 
   .logo {
     margin: 0 2rem 0 0;

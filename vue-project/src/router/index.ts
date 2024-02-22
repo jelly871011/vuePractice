@@ -1,5 +1,7 @@
+/* eslint-disable no-tabs */
 import { createRouter, createWebHistory } from 'vue-router';
-import HomeView from '../views/HomeView.vue';
+import HomeView from '../views/HomePage.vue';
+import AboutView from '../views/UsersPage.vue';
 
 const router = createRouter({
 	history: createWebHistory(import.meta.env.BASE_URL),
@@ -10,9 +12,9 @@ const router = createRouter({
 			component: HomeView,
 		},
 		{
-			path: '/about',
-			name: 'about',
-			component: () => import('../views/AboutView.vue'),
+			path: '/users',
+			name: 'users',
+			component: AboutView,
 		},
 	],
 });
