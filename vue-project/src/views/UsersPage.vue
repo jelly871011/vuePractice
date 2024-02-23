@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
-import type { AxiosResponse } from 'axios';
 import { ElForm, ElNotification } from 'element-plus';
 
 // data
@@ -13,6 +12,9 @@ const form = ref({
 	_id: '', name: '', username: '', enable: true,
 });
 const formRef = ref<typeof ElForm | null>(null);
+
+const loading = ref(false);
+const checked = ref(false);
 
 // pagination
 const currentPage = ref(1);
@@ -46,9 +48,18 @@ function showMessage(message: string, type: 'success' | 'error') {
 }
 
 /**
+ * 日期格式轉換
+ */
+const formatDate = (dateString: string) => {
+	const date = new Date(dateString);
+	return date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+};
+
+/**
  * 取得後台帳號列表
  */
 const getTableData = async () => {
+	loading.value = true;
 	try {
 		const response = await axios.get('/api/v1/users/list');
 
@@ -60,21 +71,16 @@ const getTableData = async () => {
 		const startIndex = (currentPage.value - 1) * pageSize.value;
 		const endIndex = currentPage.value * pageSize.value;
 
-		tableData.value = rawData.map((item: { created_at: string; }, index: number) => {
-			const date = new Date(item.created_at);
-			const formattedDate = date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
-
-			return {
-				...item,
-				created_at: date,
-				formattedDate,
-				index: index + 1,
-			};
-		}).slice(startIndex, endIndex);
+		tableData.value = rawData.map((item: { created_at: string; }, index: number) => ({
+			...item,
+			created_at: new Date(item.created_at),
+			formattedDate: formatDate(item.created_at),
+			index: index + 1,
+		})).slice(startIndex, endIndex);
 
 		totalItems.value = rawData.length;
+		loading.value = false;
 	} catch (error) {
-		showMessage('讀取失敗', 'error');
 		console.error(error);
 	}
 };
@@ -121,25 +127,12 @@ function setFormValue(row: { _id: string; username: string; name: string; enable
 }
 
 /**
- * 新增/編輯會員
+ * API 呼叫和錯誤處理
  */
-function openEditDialog(row: { _id: string; username: string; name: string; enable: boolean;}) {
-	editDialog.value = true;
-	setFormValue(row);
-}
-
-const updateData = async () => {
-	let res: AxiosResponse;
-	const { _id: id } = form.value;
-
+async function callApi(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: object) {
 	try {
-		if (id !== undefined && id !== '') {
-			res = await axios.put(`/api/v1/users/${id}`, form.value);
-		} else {
-			res = await axios.post('/api/v1/users', form.value);
-		}
-
-		if (res.data.result === 'ok') {
+		const response = await axios({ method, url, data });
+		if (response.data.result === 'ok') {
 			showMessage('更新成功', 'success');
 			await getTableData();
 		} else {
@@ -148,14 +141,27 @@ const updateData = async () => {
 	} catch (error) {
 		showMessage('更新失敗', 'error');
 		console.error(error);
-	} finally {
-		editDialog.value = false;
 	}
-};
-
-function closeEditDialog() {
-	editDialog.value = false;
 }
+
+/**
+ * 新增/編輯會員
+ */
+function openEditDialog(row: { _id: string; username: string; name: string; enable: boolean;}) {
+	editDialog.value = true;
+	setFormValue(row);
+}
+
+const updateData = async () => {
+	const { _id: id } = form.value;
+
+	if (id !== undefined && id !== '') {
+		await callApi('put', `/api/v1/users/${id}`, form.value);
+	} else {
+		await callApi('post', '/api/v1/users', form.value);
+	}
+	editDialog.value = false;
+};
 
 const submitForm = async () => {
 	if (formRef.value) {
@@ -180,25 +186,9 @@ function openDeleteDialog(row: { _id: string; username: string; name: string; en
 
 const deleteData = async () => {
 	const { _id: id } = form.value;
-
-	try {
-		const res = await axios.delete(`/api/v1/users/${id}`, { data: form.value });
-		if (res.data.result === 'ok') {
-			showMessage('更新成功', 'success');
-			getTableData();
-		} else {
-			showMessage('更新失敗', 'error');
-		}
-	} catch (error) {
-		showMessage('更新失敗', 'error');
-		console.error(error);
-	}
+	await callApi('delete', `/api/v1/users/${id}`, form.value);
 	deleteDialog.value = false;
 };
-
-function closeDeleteDialog() {
-	deleteDialog.value = false;
-}
 
 /**
  * 啟用/停用
@@ -221,11 +211,15 @@ onMounted(() => {
 <template>
   <div>
     <h1 style="font-size: 30px;" class="green">後台帳號管理</h1>
-    <el-row>
-      <input v-model="searchMessage" placeholder="搜尋帳號或暱稱" />
+    <el-row style="display: flex; align-items: center;">
+      <el-icon size="20px" class="green">
+        <Search />
+      </el-icon>
+      <el-input v-model="searchMessage" placeholder="搜尋帳號或暱稱" style="padding-left: 1em; padding-right: 1em;" />
       <el-button type="primary" @click="openEditDialog">新增會員</el-button>
+      <el-button type="primary">批次刪除</el-button>
     </el-row>
-    <el-table class="el-table" :data="filteredData" style="width: 100%">
+    <el-table v-loading="loading" class="el-table" :data="filteredData" style="width: 100%">
       <el-table-column prop="index" label="排序" />
       <el-table-column prop="formattedDate" label="建立時間" />
       <el-table-column prop="username" label="帳號" />
@@ -234,8 +228,8 @@ onMounted(() => {
         <template v-slot="{ row }">
           <el-switch
             v-model="row.enable"
-            active-color="#13ce66"
-            inactive-color="#ff4949"
+            active-color="hsla(160, 100%, 37%, 1)"
+            inactive-color="rgba(60, 60, 60, 0.12)"
             @change="handleSwitchChange(row)" />
         </template>
       </el-table-column>
@@ -244,6 +238,9 @@ onMounted(() => {
           <el-button v-model="row.id" type="primary" @click="openEditDialog(row)">編輯</el-button>
           <el-button v-model="row.id" type="primary" @click="openDeleteDialog(row)">刪除</el-button>
         </template>
+      </el-table-column>
+      <el-table-column style="width: 1em;" prop="checked" label="選取">
+        <el-checkbox v-model="checked" label="" size="large" />
       </el-table-column>
     </el-table>
 
@@ -261,7 +258,7 @@ onMounted(() => {
           <el-input v-model="form.name" />
         </el-form-item>
       </el-form>
-      <el-button @click="closeEditDialog">取消</el-button>
+      <el-button @click="editDialog = false">取消</el-button>
       <el-button type="primary" @click="submitForm">確認</el-button>
     </el-dialog>
     <el-dialog
@@ -272,7 +269,7 @@ onMounted(() => {
     >
       <span style="display: block;">帳號: {{ form.username }}</span>
       <span style="display: block;">暱稱: {{ form.name }}</span>
-      <el-button @click="closeDeleteDialog">取消</el-button>
+      <el-button @click="deleteDialog = false">取消</el-button>
       <el-button type="primary" @click="deleteData">確認</el-button>
     </el-dialog>
     <el-pagination
@@ -280,7 +277,6 @@ onMounted(() => {
       @current-change="handleCurrentChange"
       :current-page="currentPage"
       :page-size="pageSize"
-      class="green"
       layout="sizes, prev, pager, next"
       :page-sizes="[10, 20, 30]"
       :total="totalItems" />
@@ -288,9 +284,7 @@ onMounted(() => {
 </template>
 
 <style scoped>
-  input {
-    margin-bottom: 1rem;
-    margin-right: 1rem;
+  .el-input {
     width: 10rem;
     height: 2rem;
     border-radius: 0.2rem;
@@ -298,10 +292,9 @@ onMounted(() => {
   .el-pagination {
     margin-top: 1rem;
   }
-	.title {
-		display: flex;
-	}
 	.el-row {
-  float: right;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
   }
 </style>

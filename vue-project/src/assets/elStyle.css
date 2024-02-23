@@ -1,0 +1,31 @@
+.el-menu-item:hover,
+.el-menu-item.is-active {
+  background-color: transparent !important;
+  color: hsla(160, 100%, 37%, 1) !important;
+}
+
+.el-menu-item {
+  text-align: center;
+}
+.el-main {
+  padding: 20px;
+}
+
+.el-menu {
+  height: 1000px !important;
+  background-color: rgba(235, 235, 235, 0.64) !important;
+  border-width: 0.5px !important;
+}
+
+.el-aside {
+  width: 300px !important;
+}
+
+.el-button {
+  background-color: hsla(160, 100%, 37%, 1) !important;
+  color:#ffffff !important;
+  border: 0cm !important;
+}
+.el-table-tr-bg-color {
+  background-color: transparent !important;
+}
