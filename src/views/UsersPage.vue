@@ -5,8 +5,8 @@ import { ElForm, ElNotification } from 'element-plus';
 
 // data
 const searchMessage = ref('');
-const editDialog = ref(false);
-const deleteDialog = ref(false);
+const isEditDialog = ref(false);
+const isDeleteDialog = ref(false);
 const tableData = ref([]);
 const form = ref({
 	_id: '', name: '', username: '', enable: true,
@@ -16,10 +16,20 @@ const formRef = ref<typeof ElForm | null>(null);
 const loading = ref(false);
 const checked = ref(false);
 
+// interface
+interface Row {
+  _id: string;
+  username: string;
+  name: string;
+  enable: boolean;
+}
+
 // pagination
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalItems = ref(0);
+
+
 
 // rules
 const rules = ref({
@@ -28,9 +38,6 @@ const rules = ref({
 		{
 			min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur',
 		},
-		// {
-		// 	pattern: /^[a-z0-9]+$/i, message: '帳號只能包含字母和數字', trigger: 'change',
-		// },
 	],
 	name: [
 		{ required: true, message: '暱稱不可為空', trigger: 'blur' },
@@ -56,12 +63,27 @@ const formatDate = (dateString: string) => {
 };
 
 /**
+ * API 呼叫和錯誤處理
+ */
+async function callApi(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: object) {
+	const response = await axios({ method, url, data });
+	if (response.data.result === 'ok') {
+		if (method !== 'get') {
+			showMessage('更新成功', 'success');
+		}
+	} else {
+		showMessage('更新失敗', 'error');
+	}
+	return response;
+}
+
+/**
  * 取得後台帳號列表
  */
 const getTableData = async () => {
 	loading.value = true;
 	try {
-		const response = await axios.get('/api/v1/users/list');
+		const response = await callApi('get', '/api/v1/users/list');
 
 		const rawData = response.data.ret.sort((
 			a: { created_at: string },
@@ -113,7 +135,7 @@ const filteredData = computed(() => {
 /**
  * 設定表單值
  */
-function setFormValue(row: { _id: string; username: string; name: string; enable: boolean; }) {
+function setFormValue(row: Row) {
 	const {
 		username, _id, name, enable,
 	} = row;
@@ -127,28 +149,10 @@ function setFormValue(row: { _id: string; username: string; name: string; enable
 }
 
 /**
- * API 呼叫和錯誤處理
- */
-async function callApi(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: object) {
-	try {
-		const response = await axios({ method, url, data });
-		if (response.data.result === 'ok') {
-			showMessage('更新成功', 'success');
-			await getTableData();
-		} else {
-			throw new Error('更新失敗');
-		}
-	} catch (error) {
-		showMessage('更新失敗', 'error');
-		console.error(error);
-	}
-}
-
-/**
  * 新增/編輯會員
  */
-function openEditDialog(row: { _id: string; username: string; name: string; enable: boolean;}) {
-	editDialog.value = true;
+function openEditDialog(row: Row) {
+	isEditDialog.value = true;
 	setFormValue(row);
 }
 
@@ -157,10 +161,12 @@ const updateData = async () => {
 
 	if (id !== undefined && id !== '') {
 		await callApi('put', `/api/v1/users/${id}`, form.value);
+		await getTableData();
 	} else {
 		await callApi('post', '/api/v1/users', form.value);
+		await getTableData();
 	}
-	editDialog.value = false;
+	isEditDialog.value = false;
 };
 
 const submitForm = async () => {
@@ -168,7 +174,7 @@ const submitForm = async () => {
 		formRef.value.validate(async (valid: boolean) => {
 			if (valid) {
 				await updateData();
-				editDialog.value = false;
+				isEditDialog.value = false;
 			} else {
 				showMessage('更新失敗', 'error');
 			}
@@ -179,26 +185,22 @@ const submitForm = async () => {
 /**
  * 刪除會員
  */
-function openDeleteDialog(row: { _id: string; username: string; name: string; enable: boolean; }) {
-	deleteDialog.value = true;
+function openDeleteDialog(row: Row) {
+	isDeleteDialog.value = true;
 	setFormValue(row);
 }
 
 const deleteData = async () => {
 	const { _id: id } = form.value;
 	await callApi('delete', `/api/v1/users/${id}`, form.value);
-	deleteDialog.value = false;
+	await getTableData();
+	isDeleteDialog.value = false;
 };
 
 /**
  * 啟用/停用
  */
-function handleSwitchChange(row: {
-  _id: string;
-  username: string;
-  name: string;
-  enable: boolean;
-}) {
+function handleSwitchChange(row: Row) {
 	form.value = row;
 	updateData();
 }
@@ -247,7 +249,7 @@ onMounted(() => {
     <el-dialog
       :title="form._id ? '編輯會員' : '新增會員'"
       :data="form"
-      v-model="editDialog"
+      v-model="isEditDialog"
       width="30%"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="80px">
@@ -258,18 +260,18 @@ onMounted(() => {
           <el-input v-model="form.name" />
         </el-form-item>
       </el-form>
-      <el-button @click="editDialog = false">取消</el-button>
+      <el-button @click="isEditDialog = false">取消</el-button>
       <el-button type="primary" @click="submitForm">確認</el-button>
     </el-dialog>
     <el-dialog
       title="確認刪除此會員?"
       :data="form"
-      v-model="deleteDialog"
+      v-model="isDeleteDialog"
       width="20%"
     >
       <span style="display: block;">帳號: {{ form.username }}</span>
       <span style="display: block;">暱稱: {{ form.name }}</span>
-      <el-button @click="deleteDialog = false">取消</el-button>
+      <el-button @click="isDeleteDialog = false">取消</el-button>
       <el-button type="primary" @click="deleteData">確認</el-button>
     </el-dialog>
     <el-pagination
