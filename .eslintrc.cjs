@@ -55,5 +55,6 @@ module.exports = {
 			'off',
 		],
 		'no-console': 'off',
+		'object-curly-newline': 'off',
 	},
 };

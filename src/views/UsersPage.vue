@@ -8,9 +8,7 @@ const searchMessage = ref('');
 const isEditDialog = ref(false);
 const isDeleteDialog = ref(false);
 const tableData = ref([]);
-const form = ref({
-	_id: '', name: '', username: '', enable: true,
-});
+const form = ref({ _id: '', name: '', username: '', enable: true });
 const formRef = ref<typeof ElForm | null>(null);
 
 const loading = ref(false);
@@ -29,19 +27,13 @@ const currentPage = ref(1);
 const pageSize = ref(10);
 const totalItems = ref(0);
 
-
-
 // rules
 const rules = ref({
 	username: [
 		{ required: true, message: '帳號不可為空', trigger: 'blur' },
-		{
-			min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur',
-		},
+		{ min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur' },
 	],
-	name: [
-		{ required: true, message: '暱稱不可為空', trigger: 'blur' },
-	],
+	name: [{ required: true, message: '暱稱不可為空', trigger: 'blur' }],
 });
 
 /**
@@ -82,9 +74,10 @@ async function callApi(method: 'get' | 'post' | 'put' | 'delete', url: string, d
  */
 const getTableData = async () => {
 	loading.value = true;
-	try {
-		const response = await callApi('get', '/api/v1/users/list');
 
+	const response = await callApi('get', '/api/v1/users/list');
+
+	if (response.data.result === 'ok') {
 		const rawData = response.data.ret.sort((
 			a: { created_at: string },
 			b: { created_at: string },
@@ -102,8 +95,6 @@ const getTableData = async () => {
 
 		totalItems.value = rawData.length;
 		loading.value = false;
-	} catch (error) {
-		console.error(error);
 	}
 };
 
@@ -112,10 +103,12 @@ const getTableData = async () => {
  */
 const handleSizeChange = async (val: number) => {
 	pageSize.value = val;
+
 	await getTableData();
 };
 const handleCurrentChange = async (val: number) => {
 	currentPage.value = val;
+
 	await getTableData();
 };
 
@@ -135,10 +128,8 @@ const filteredData = computed(() => {
 /**
  * 設定表單值
  */
-function setFormValue(row: Row) {
-	const {
-		username, _id, name, enable,
-	} = row;
+function setFormValue(row: { _id: string; username: string; name: string; enable: boolean; }) {
+	const { username, _id, name, enable } = row;
 
 	form.value = {
 		username,
