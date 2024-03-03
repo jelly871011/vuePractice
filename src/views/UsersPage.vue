@@ -3,17 +3,6 @@ import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import { ElForm, ElNotification } from 'element-plus';
 
-// data
-const searchMessage = ref('');
-const isEditDialog = ref(false);
-const isDeleteDialog = ref(false);
-const tableData = ref([]);
-const form = ref({ _id: '', name: '', username: '', enable: true });
-const formRef = ref<typeof ElForm | null>(null);
-
-const loading = ref(false);
-const checked = ref(false);
-
 // interface
 interface Row {
   _id: string;
@@ -22,182 +11,196 @@ interface Row {
   enable: boolean;
 }
 
+// data
+const searchMessage = ref('');
+const isEditDialog = ref(false);
+const isDeleteDialog = ref(false);
+const tableData = ref<{ username: string, name: string }[]>([]);
+const form = ref({ _id: '', name: '', username: '', enable: true });
+const formRef = ref<typeof ElForm | null>(null);
+const loading = ref(false);
+const checked = ref(false);
 // pagination
 const currentPage = ref(1);
 const pageSize = ref(10);
 const totalItems = ref(0);
 
 // rules
-const rules = ref({
-	username: [
-		{ required: true, message: '帳號不可為空', trigger: 'blur' },
-		{ min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur' },
-	],
-	name: [{ required: true, message: '暱稱不可為空', trigger: 'blur' }],
-});
+const rules = {
+  username: [
+    { required: true, message: '帳號不可為空', trigger: 'blur' },
+    { min: 3, max: 20, message: '長度在 3 到 20 個字元', trigger: 'blur' },
+  ],
+  name: [{ required: true, message: '暱稱不可為空', trigger: 'blur' }],
+};
 
 /**
  * 顯示訊息
  */
 function showMessage(message: string, type: 'success' | 'error') {
-	ElNotification({
-		message,
-		type,
-	});
+  ElNotification({
+    message,
+    type,
+  });
 }
 
 /**
  * 日期格式轉換
  */
 const formatDate = (dateString: string) => {
-	const date = new Date(dateString);
-	return date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const date = new Date(dateString);
+
+  return date.toLocaleDateString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit' });
 };
 
 /**
  * API 呼叫和錯誤處理
  */
 async function callApi(method: 'get' | 'post' | 'put' | 'delete', url: string, data?: object) {
-	const response = await axios({ method, url, data });
-	if (response.data.result === 'ok') {
-		if (method !== 'get') {
-			showMessage('更新成功', 'success');
-		}
-	} else {
-		showMessage('更新失敗', 'error');
-	}
-	return response;
+  if (method === 'get') {
+    return axios.get(url, { params: data });
+  }
+
+  const response = await axios({ method, url, data });
+
+  if (response.data.result === 'ok') {
+    showMessage('更新成功', 'success');
+  } else {
+    showMessage('更新失敗', 'error');
+  }
+
+  return response;
 }
 
 /**
  * 取得後台帳號列表
  */
 const getTableData = async () => {
-	loading.value = true;
+  loading.value = true;
 
-	const response = await callApi('get', '/api/v1/users/list');
+  const firstResult = (currentPage.value - 1) * pageSize.value;
+  const maxResult = pageSize.value;
 
-	if (response.data.result === 'ok') {
-		const rawData = response.data.ret.sort((
-			a: { created_at: string },
-			b: { created_at: string },
-		) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const response = await callApi('get', '/api/v1/users/list', {
+    first_result: firstResult,
+    max_result: maxResult,
+  });
 
-		const startIndex = (currentPage.value - 1) * pageSize.value;
-		const endIndex = currentPage.value * pageSize.value;
+  if (response.data.result === 'ok') {
+    const rawData = response.data.ret.sort((
+      a: { created_at: string },
+      b: { created_at: string },
+    ) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-		tableData.value = rawData.map((item: { created_at: string; }, index: number) => ({
-			...item,
-			created_at: new Date(item.created_at),
-			formattedDate: formatDate(item.created_at),
-			index: index + 1,
-		})).slice(startIndex, endIndex);
+    tableData.value = rawData.map((item: { created_at: string; }, index: number) => ({
+      ...item,
+      created_at: new Date(item.created_at),
+      formattedDate: formatDate(item.created_at),
+      index: firstResult + index + 1,
+    }));
 
-		totalItems.value = rawData.length;
-		loading.value = false;
-	}
+    totalItems.value = response.data.pagination.total;
+    loading.value = false;
+  }
 };
 
 /**
  * 分頁
+ *
+ * @param val - 每頁顯示筆數
  */
-const handleSizeChange = async (val: number) => {
-	pageSize.value = val;
+const handleSizeChange = (val: number) => {
+  pageSize.value = val;
 
-	await getTableData();
+  getTableData();
 };
-const handleCurrentChange = async (val: number) => {
-	currentPage.value = val;
 
-	await getTableData();
+const handleCurrentChange = (val: number) => {
+  currentPage.value = val;
+
+  getTableData();
 };
 
 /**
  * 模糊搜尋篩選資料
  */
-const filteredData = computed(() => {
-	if (!searchMessage.value) {
-		return tableData.value;
-	}
-	return tableData.value.filter((item: { username: string, name: string }) => (
-		item.username.includes(searchMessage.value)
-    || item.name.includes(searchMessage.value)
-	));
-});
+const filteredData = computed(() => (!searchMessage.value
+  ? tableData.value
+  : tableData.value
+    .filter((item) => item.username.includes(searchMessage.value)
+    || item.name.includes(searchMessage.value))));
 
 /**
  * 設定表單值
  */
-function setFormValue(row: { _id: string; username: string; name: string; enable: boolean; }) {
-	const { username, _id, name, enable } = row;
+function setFormValue(row: Row) {
+  const { username, _id, name, enable } = row;
 
-	form.value = {
-		username,
-		name,
-		_id,
-		enable,
-	};
+  form.value = {
+    username,
+    name,
+    _id,
+    enable,
+  };
 }
 
 /**
  * 新增/編輯會員
  */
 function openEditDialog(row: Row) {
-	isEditDialog.value = true;
-	setFormValue(row);
+  isEditDialog.value = true;
+  setFormValue(row);
 }
 
 const updateData = async () => {
-	const { _id: id } = form.value;
+  const { _id: id } = form.value;
 
-	if (id !== undefined && id !== '') {
-		await callApi('put', `/api/v1/users/${id}`, form.value);
-		await getTableData();
-	} else {
-		await callApi('post', '/api/v1/users', form.value);
-		await getTableData();
-	}
-	isEditDialog.value = false;
+  const method = id ? 'put' : 'post';
+  const url = id ? `/api/v1/users/${id}` : '/api/v1/users';
+
+  await callApi(method, url, form.value);
+  isEditDialog.value = false;
+  getTableData();
 };
 
 const submitForm = async () => {
-	if (formRef.value) {
-		formRef.value.validate(async (valid: boolean) => {
-			if (valid) {
-				await updateData();
-				isEditDialog.value = false;
-			} else {
-				showMessage('更新失敗', 'error');
-			}
-		});
-	}
+  if (formRef.value) {
+    formRef.value.validate(async (valid: boolean) => {
+      if (valid) {
+        await updateData();
+        isEditDialog.value = false;
+      }
+    });
+  }
 };
 
 /**
  * 刪除會員
  */
 function openDeleteDialog(row: Row) {
-	isDeleteDialog.value = true;
-	setFormValue(row);
+  isDeleteDialog.value = true;
+  setFormValue(row);
 }
 
 const deleteData = async () => {
-	const { _id: id } = form.value;
-	await callApi('delete', `/api/v1/users/${id}`, form.value);
-	await getTableData();
-	isDeleteDialog.value = false;
+  const { _id: id } = form.value;
+
+  await callApi('delete', `/api/v1/users/${id}`, form.value);
+
+  getTableData();
+  isDeleteDialog.value = false;
 };
 
 /**
  * 啟用/停用
  */
 function handleSwitchChange(row: Row) {
-	form.value = row;
-	updateData();
+  form.value = row;
+  updateData();
 }
 
 onMounted(() => {
-	getTableData();
+  getTableData();
 });
 </script>
 
@@ -213,6 +216,9 @@ onMounted(() => {
       <el-button type="primary">批次刪除</el-button>
     </el-row>
     <el-table v-loading="loading" class="el-table" :data="filteredData" style="width: 100%">
+      <el-table-column style="width: 1em;" prop="checked" label="選取">
+        <el-checkbox v-model="checked" label="" size="large" />
+      </el-table-column>
       <el-table-column prop="index" label="排序" />
       <el-table-column prop="formattedDate" label="建立時間" />
       <el-table-column prop="username" label="帳號" />
@@ -231,9 +237,6 @@ onMounted(() => {
           <el-button v-model="row.id" type="primary" @click="openEditDialog(row)">編輯</el-button>
           <el-button v-model="row.id" type="primary" @click="openDeleteDialog(row)">刪除</el-button>
         </template>
-      </el-table-column>
-      <el-table-column style="width: 1em;" prop="checked" label="選取">
-        <el-checkbox v-model="checked" label="" size="large" />
       </el-table-column>
     </el-table>
 
@@ -285,7 +288,7 @@ onMounted(() => {
   .el-pagination {
     margin-top: 1rem;
   }
-	.el-row {
+  .el-row {
     display: flex;
     justify-content: flex-end;
     margin-bottom: 1rem;

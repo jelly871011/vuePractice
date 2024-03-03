@@ -10,7 +10,7 @@ import router from './router';
 
 const app = createApp(App);
 Object.entries(ElementPlusIconsVue).forEach(([key, component]) => {
-	app.component(key, component);
+  app.component(key, component);
 });
 app.use(ElementPlus);
 app.use(createPinia());
